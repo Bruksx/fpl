@@ -1,0 +1,3 @@
+1. get top 1000 players
+2. get players with 3 years history
+3. get average rank of players for past 3 seasons
