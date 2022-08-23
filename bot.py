@@ -23,33 +23,54 @@ class FantasyBot:
         self.limits = httpx.Limits(max_keepalive_connections=1, max_connections=1)
     
     async def get_overall_standings(self, page):
-        params = {"page_standings":page}
-        async with httpx.AsyncClient() as client:
-            data = await client.get(self.standings.format(self.base_url, 314), params=params, timeout=None)
-            #print(f"geting page {data.url}")
-            data = data.json()
-        return data
+        print(f"geting page {page}")
+        with open("json/overall.json") as f:
+            fetched = json.loads(f.read())
+        page_found = False
+        for p in fetched:
+            if p["standings"]["page"] == page:
+                page_found = True
+        if not page_found:
+            print(f"geting {page}")
+            params = {"page_standings":page}
+            async with sem:
+                async with httpx.AsyncClient() as client:
+                    data = await client.get(self.standings.format(self.base_url, 314), params=params, timeout=None)
+                    data = data.json()
+            return data
     
     #@timed
     async def get_all_pages_overall_standings(self):
-        data = await asyncio.gather(*map(self.get_overall_standings, range(1,21)))
+        data = await asyncio.gather(*map(self.get_overall_standings, range(1,201)))
+        data = [i for i in data if i != None]
+        with open("json/overall.json", "r") as f:
+            old_data = json.loads(f.read())
+        print(data + old_data)
         with open("json/overall.json", "w") as f:
-            f.write(json.dumps(data, indent=4))
+            f.write(json.dumps(old_data + data, indent=4))
         return data
     
     async def get_player_history(self, id):
         async with sem:
-            async with httpx.AsyncClient(limits=self.limits) as client:
-                data = await client.get(self.history.format(self.base_url, id), timeout=None)
-                #print(json.dumps(data.json(),indent=4))
-                history = data.json()["past"]
-        return history
+            async with httpx.AsyncClient() as client:
+                try:
+                    data = await client.get(self.history.format(self.base_url, id), timeout=None)
+                    history = data.json()["past"]
+                    return history
+                except httpx.ConnectError:
+                    print("connect error, sleeping")
+                    time.sleep(10)
+                    await self.get_player_history(id)
     
     async def get_average_rank_previous_seasons(self, id):
         seasons = 4
         print(f"geting history of {id}")
         history = await self.get_player_history(id)
-        length = len(history)
+        print(f"fetched history of {id}")
+        try:
+            length = len(history)
+        except TypeError:
+            length = 0
         if length >= seasons:
             last_4_seasons = history[-seasons:]
             ranks = [seasons["rank"] for seasons in last_4_seasons]
@@ -72,12 +93,15 @@ class FantasyBot:
     async def get_all_average_rank_of_previous_seasons(self):
         ids = self.get_ids_from_file()
         data = {}
-        #for id in ids:
-        average_rank = await asyncio.gather(*map(self.get_average_rank_previous_seasons,ids))
-        print(list(average_rank))
-        #print(average_rank)
-    
+        average_rank = await asyncio.gather(*map(self.get_average_rank_previous_seasons,ids[:1001]))
+        li = list(average_rank)
+        ranked = [i for i in li if i != None]
+        data["none"] = li.count(None)
+        data["average_rank"] = int(sum(ranked)/len(ranked))
+        print(data)
+        #return data
 
+    
 
 
 if __name__ == "__main__":
