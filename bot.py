@@ -106,7 +106,7 @@ class FantasyBot:
 
 if __name__ == "__main__":
     bot = FantasyBot()
-    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+    #asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
     #print(asyncio.run(bot.get_average_rank_previous_seasons(34566, 5)))
     #print(asyncio.run(bot.get_all_pages_overall_standings()))
     #print(bot.get_ids_from_file())
